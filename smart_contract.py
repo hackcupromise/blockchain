@@ -22,7 +22,12 @@ FIELD_PXID_TIME = 0x17
 #  end field identifiers
 
 #  Method identifiers
-#  TODO
+METHOD_BUSINESS_ADD_FUNDS = 0x1
+METHOD_CHECK_PROMISE_FUNDS = 0x2
+METHOD_USER_CREATE_DONATION = 0x3
+METHOD_BUSINESS_MATCH_FUNDS = 0x4
+METHOD_CHECK_DONATION_STRUCT = 0x5
+
 # End Method identifiers
 
 #  other constants
@@ -157,13 +162,93 @@ def get_asset_input_amount(asset_id):
     return value
 
 
+def business_match_funds(business_pk, pxid):
+    '''
+    Inputs: business_pk: Public Key of business adding neo
+    pxid: Identifier of transaction that the business is matching
+
+    Will match a pledge specified by pxid if time has not run out. If Neo attached
+    exceeds the promised amount, the transaction fails.
+    If the Neo is less than or equal, the promise field is updated with the difference.
+    '''
+    if not CheckWitness(business_pk):
+        Log("Business CheckWitness failed")
+        return False
+
+    committed_amount = get_neo_input_amount()
+    ctx = GetContext()
+
+    promise_key = concat(pxid, FIELD_PXID_PROMISE)
+
+    promised_amount = Get(ctx, promise_key)
+    diff = promised_amount - committed_amount
+    if not promised_amount or diff < 0:
+        # If promised amount doesn't exist or if the commited amount is more than promised
+        return False
+
+    time_key = concat(pxid, FIELD_PXID_TIME)
+    current_time = get_current_time()
+    end_time = Get(ctx, time_key)
+
+    # If time has run out, transaction fails
+    if current_time > end_time:
+        return False
+
+    fulfilled_key = concat(pxid, FIELD_PXID_FULFILLED)
+
+    # Update promised amount
+    Put(ctx, promise_key, diff)
+    Put(ctx, fulfilled_key, promised_amount)
+
+    return True
+
+
 def generate_pxid(business_pk, user_pk, charity_pk):
     return concat(business_pk, concat(user_pk, charity_pk))
 
 
-def Main(operation, business_pk, user_pk, charity_pk, amount_promise) -> int:
-    Log("testing log messages:")
-    Log(42)
+def check_donation_struct(user_pk, business_pk, charity_pk):
+    pxid = generate_pxid(business_pk, user_pk, charity_pk)
+    ctx = GetContext()
 
-    business_add_funds(business_pk, amount_promise)
-    return user_create_donation(user_pk, business_pk, charity_pk)
+    field_user_id = concat(pxid, FIELD_PXID_USER_ID)
+    field_business_id = concat(pxid, FIELD_PXID_BUSINESS_ID)
+    field_charity_id = concat(pxid, FIELD_PXID_CHARITY_ID)
+    field_amount_id = concat(pxid, FIELD_PXID_AMOUNT)
+    field_promise_id = concat(pxid, FIELD_PXID_PROMISE)
+    field_time_id = concat(pxid, FIELD_PXID_TIME)
+    field_fulfilled = concat(pxid, FIELD_PXID_FULFILLED)
+
+    user_id = Get(ctx, field_user_id)
+    business_id = Get(ctx, field_business_id)
+    charity_id = Get(ctx, field_charity_id)
+    amount = Get(ctx, field_amount_id)
+    promise  = Get(ctx, field_promise_id)
+    time = Get(ctx, field_time_id)
+    fulfilled = Get(ctx, field_fulfilled)
+
+    ret_val = concat(user_id, concat(",", concat(business_id, concat(",", concat(charity_id, concat(",",
+                concat(amount, concat(",",concat(promise, concat(",",concat(time,concat(",", fulfilled))))))))))))
+    return ret_val
+
+
+def Main(operation, args) -> int:
+    if operation == METHOD_BUSINESS_ADD_FUNDS:
+        #  business_add_funds
+        return business_add_funds(args[0], args[1])
+
+    elif operation == METHOD_BUSINESS_MATCH_FUNDS:
+        #  business_match_funds
+        return business_match_funds(args[0], args[1])
+
+    elif operation == METHOD_CHECK_DONATION_STRUCT:
+        # check_donation_struct
+        return check_donation_struct(args[0], args[1], args[2])
+
+    elif operation == METHOD_CHECK_PROMISE_FUNDS:
+        # check_promise_funds
+        return check_promise_funds(args[0])
+
+    elif operation == METHOD_USER_CREATE_DONATION:
+        # user_create_donation
+        return user_create_donation(args[0], args[1], args[2])
