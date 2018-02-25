@@ -161,8 +161,8 @@ def get_asset_input_amount(asset_id):
     Log("The tx inputs are:")
     Log(42)
     return value
-#
-#
+
+
 def business_match_funds(business_pk, user_pk, charity_pk):
     '''
     Inputs: business_pk: Public Key of business adding neo
@@ -210,7 +210,8 @@ def generate_pxid(business_pk, user_pk, charity_pk):
     return concat(business_pk, user_charity)
 
 
-def check_donation_struct(pxid):
+def check_donation_struct(user_pk, business_pk, charity_pk):
+    pxid = generate_pxid(business_pk, user_pk, charity_pk)
     ctx = GetContext()
 
     field_user_id = concat(pxid, FIELD_PXID_USER_ID)
