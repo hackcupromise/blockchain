@@ -4,10 +4,9 @@ from boa.blockchain.vm.Neo.Transaction import Transaction, GetReferences, GetOut
 from boa.blockchain.vm.Neo.Output import GetValue, GetAssetId, GetScriptHash
 from boa.blockchain.vm.Neo.Runtime import CheckWitness
 from boa.blockchain.vm.Neo.Storage import GetContext, Get, Put, Delete
+from boa.blockchain.vm.Neo.Blockchain import GetHeight, GetHeader
 
-
-
-
+'''
 METHOD_USER_DONATE = 0x1
 METHOD_BUSINESS_DONATE = 0x2
 METHOD_START_BUSINESS_TRANSACTION = 0x3
@@ -15,10 +14,12 @@ METHOD_TRY_CHARITY_PAYOUT = 0x4
 METHOD_TRY_REFUND_USER = 0x5
 METHOD_TRY_REFUND_BUSINESS = 0x6
 TWOWEEKS = 1209600000
-
+'''
 '''
 Class copied from neo_ico_template:
 https://github.com/neonexchange/neo-ico-template
+'''
+
 '''
 class Attachments():
     """
@@ -35,10 +36,8 @@ class Attachments():
     neo_asset_id = b'\x9b|\xff\xda\xa6t\xbe\xae\x0f\x93\x0e\xbe`\x85\xaf\x90\x93\xe5\xfeV\xb3J\\"\x0c\xcd\xcfn\xfc3o\xc5'
 
     gas_asset_id = b'\xe7-(iy\xeel\xb1\xb7\xe6]\xfd\xdf\xb2\xe3\x84\x10\x0b\x8d\x14\x8ewX\xdeB\xe4\x16\x8bqy,`'
-
-    def Getneo_attached():
-        return neo_attached
-
+    def get_neo_attached(self):
+        return self.neo_attached
 
 
 def get_asset_attachments() -> Attachments:
@@ -74,30 +73,31 @@ def get_asset_attachments() -> Attachments:
 
 
     return attachment
-
+'''
 # Copied from LuckyNeo
 def GetEndTime():
+
     context = GetContext()
     currentHeight = GetHeight()
     currentHeader = GetHeader(currentHeight)
-    time = currentHeader.Timestamp + TWOWEEKS
+    #time = currentHeader.Timestamp + TWOWEEKS
     print('setting time')
     print(time)
     #Put(context, "endTime", time)
-    return time
+    #return time
+    return 0
 
-'''
-class Donation:
+#class Donation():
+    '''
     def __init__(self, user_pk, business_pk, charity_pk, user_neo_amount):
         self.user_pk = user_pk
         self.business_pk = business_pk
         self.charity_pk = charity_pk
         self.user_neo = user_neo_amount
         self.required_match = user_neo_amount
-'''
+        '''
 
-
-def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
+def user_donate( user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
     '''
     :param user_pk: user's public key
     :param business_pk: business's public key
@@ -105,32 +105,41 @@ def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
     :param amount_bigint amount of NEO to donate
     :param txid_hash: Hash of tranaction id
     :return: true on success, false otherwise
+
+    if not CheckWitness(user_pk):  # is the user making the call
+        return False
     '''
+    neo_asset_id = b'\x9b|\xff\xda\xa6t\xbe\xae\x0f\x93\x0e\xbe`\x85\xaf\x90\x93\xe5\xfeV\xb3J\\"\x0c\xcd\xcfn\xfc3o\xc5'
+    gas_asset_id = b'\xe7-(iy\xeel\xb1\xb7\xe6]\xfd\xdf\xb2\xe3\x84\x10\x0b\x8d\x14\x8ewX\xdeB\xe4\x16\x8bqy,`'
+
     tx = GetScriptContainer()  # type:Transaction
     references = tx.References
-    attachment.receiver_addr = GetExecutingScriptHash()
+    receiver_addr = GetExecutingScriptHash()
+
     sent_amount_neo = 0
     sent_amount_gas = 0
 
     if len(references) > 0:
 
         reference = references[0]
-        attachment.sender_addr = reference.ScriptHash
-                
+        sender_addr = reference.ScriptHash
+
+        #o = tx.Outputs
+
         for output in tx.Outputs:
-            if output.ScriptHash == attachment.receiver_addr and output.AssetId == attachment.neo_asset_id:
+            if output.ScriptHash == receiver_addr and output.AssetId == neo_asset_id:
                 sent_amount_neo += output.Value
 
-            if output.ScriptHash == attachment.receiver_addr and output.AssetId == attachment.gas_asset_id:
+            if output.ScriptHash == receiver_addr and output.AssetId == gas_asset_id:
                 sent_amount_gas += output.Value
 
-    if not CheckWitness(user_pk):  # is the user making the call
-        return False
+        neo_attached = sent_amount_neo
+        gas_attached = sent_amount_gas
 
     # Get Neo from user - NOTE: This will be the hard part
-    attachment = get_asset_attachments()
-    if sent_amount_neo != 0:
-
+    #attachment = get_asset_attachments()
+    #if attachment.neo_attached != 0:
+    if neo_attached != 0:
         # Create struct with info - LIST
         # Info to include: userpk, charitypk, businesspk, amount, amount promised, time, transaction ID - key
         ctx = GetContext() # Get context for storage
@@ -149,46 +158,47 @@ def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
 
         # Now put the list in the context at the key val txid_hash
         Put(ctx, txid_hash, new_list)
-
+        return True
     else:
         return False
 
 
     return True
 
+'''
+    def business_donate(self,business_pk, txid_hash):
+        # Add comments back in
+        :param business_pk: business's public key
+        :param amount_bigint:
+        :param txid_hash: transaction identifier (byte array)
+        :return: true on success, false otherwise
 
-def business_donate(business_pk, txid_hash):
-    '''
-    :param business_pk: business's public key
-    :param amount_bigint:
-    :param txid_hash: transaction identifier (byte array)
-    :return: true on success, false otherwise
-    '''
-    pass
-
-
-def start_donation_transaction(user_pk, business_pk, charity_pk, txid_hash, duration):
-    pass
+        pass
 
 
-def try_charity_payout(charity_pk, txid_hash):
-    pass
+    def start_donation_transaction(user_pk, business_pk, charity_pk, txid_hash, duration):
+        pass
 
 
-def try_refund_user():
-    pass
+    def try_charity_payout(charity_pk, txid_hash):
+        pass
 
 
-def try_refund_business():
-    pass
+    def try_refund_user():
+        pass
 
 
+    def try_refund_business():
+        pass
+
+'''
 def Main(method_byte, user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
-    donate = Donate()
-    if method_byte == METHOD_USER_DONATE:
-
-        return donate.user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash)
-
+    #donate = Donation()
+    #if method_byte == METHOD_USER_DONATE:
+    #return donate.user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash)
+    return user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash)
+    return False
+'''
     elif method_byte == METHOD_BUSINESS_DONATE:
 
         return business_donate(business_pk, amount_bigint, txid_hash)
@@ -209,3 +219,4 @@ def Main(method_byte, user_pk, business_pk, charity_pk, amount_bigint, txid_hash
     elif method_byte == METHOD_TRY_REFUND_BUSINESS:
 
         return try_refund_business()
+'''
