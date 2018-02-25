@@ -1,4 +1,5 @@
-import hello_world
+import blockchain
+import testthing
 from boa.compiler import Compiler
 
-Compiler.load_and_save('hello_world.py')
+Compiler.load_and_save('testthing.py')
