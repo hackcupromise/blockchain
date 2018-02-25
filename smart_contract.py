@@ -2,14 +2,16 @@ from boa.code.builtins import concat, list
 from boa.blockchain.vm.System.ExecutionEngine import GetScriptContainer, GetExecutingScriptHash
 from boa.blockchain.vm.Neo.Transaction import Transaction, GetReferences, GetOutputs,GetUnspentCoins
 from boa.blockchain.vm.Neo.Output import GetValue, GetAssetId, GetScriptHash
-from boa.blockchain.vm.Neo.Runtime import CheckWitness, Log
+from boa.blockchain.vm.Neo.Runtime import CheckWitness, Log, GetTrigger
 from boa.blockchain.vm.Neo.Storage import GetContext, Get, Put, Delete
 from boa.blockchain.vm.Neo.Blockchain import GetHeight, GetHeader
 from boa.blockchain.vm.Neo.Header import GetTimestamp, GetNextConsensus, GetHash
 from boa.blockchain.vm.Neo.Action import RegisterAction
+from boa.blockchain.vm.Neo import TriggerType
 
 
-transfer = RegisterAction('transfer', 'to', 'amount')
+
+transfer = RegisterAction('refund', 'to', 'amount')
 
 # Field identifiers
 FIELD_BUSINESS_PROMISE_AMOUNT = 0x1
@@ -22,6 +24,8 @@ FIELD_PXID_PROMISE = 0x15
 FIELD_PXID_FULFILLED = 0x16
 FIELD_PXID_TIME = 0x17
 
+FIELD_ENTITY_TOKEN = 0x18
+
 #  end field identifiers
 
 #  Method identifiers
@@ -31,12 +35,63 @@ METHOD_USER_CREATE_DONATION = 0x3
 METHOD_BUSINESS_MATCH_FUNDS = 0x4
 METHOD_CHECK_DONATION_STRUCT = 0x5
 
+METHOD_TOKEN_TRANSFER = 0x6
+METHOD_TOKEN_SILLY_DEPLOY = 0x7
+
 # End Method identifiers
 
 #  other constants
 MONTH = 2592000000
 
 NEO_ASSET_ID = b'\x9b|\xff\xda\xa6t\xbe\xae\x0f\x93\x0e\xbe`\x85\xaf\x90\x93\xe5\xfeV\xb3J\\"\x0c\xcd\xcfn\xfc3o\xc5'
+
+OWNER = b'8`V8\x16\x0f\x02z\x89\x97!t\xd9\xa9\x8d\x19\x07\x8c\xdf\xca'
+
+
+def get_balance(pk):
+    ctx = GetContext()
+    key = concat(pk, FIELD_ENTITY_TOKEN)
+    value = Get(ctx, key)
+    if not value:
+        return 0
+    return value
+
+
+def token_transfer(from_pk, to_pk, amount):
+    if not CheckWitness(from_pk):
+        return False
+
+    ctx = GetContext()
+    from_key = concat(from_pk, FIELD_ENTITY_TOKEN)
+    from_balance = Get(ctx, from_key)
+    if not from_balance:
+        from_balance = 0
+
+    to_key = concat(to_pk, FIELD_ENTITY_TOKEN)
+    to_balance = Get(ctx, to_key)
+    if not to_balance:
+        to_balance = 0
+
+    if from_balance < amount:
+        return False
+
+    to_balance += amount
+    from_balance -= amount
+
+    Put(ctx, from_key, from_balance)
+    Put(ctx, to_key, to_balance)
+    return True
+
+
+def token_silly_deploy(amount): # comment too little time too little care
+    if not CheckWitness(OWNER):
+        return False
+
+    ctx = GetContext()
+    owner_key = concat(OWNER, FIELD_ENTITY_TOKEN)
+
+    Put(ctx, owner_key, amount)
+    return True
 
 
 def business_add_funds(business_pk, amount: int) -> bool:
@@ -301,7 +356,11 @@ def charity_transfer_completed_contracts(charity_id, pxid):
         return True
 
 
-def Main(operation, args) -> int:
+def handle_verifications():
+    return False
+
+
+def handle_application(operation, args):
     if operation == METHOD_BUSINESS_ADD_FUNDS:
         #  business_add_funds
         business_pk = args[0]
@@ -333,4 +392,25 @@ def Main(operation, args) -> int:
         business_pk = args[1]
         charity_pk = args[2]
         return user_create_donation(user_pk, business_pk, charity_pk)
-    pass
+
+    elif operation == METHOD_TOKEN_SILLY_DEPLOY:
+        #  token_silly_deploy
+        amount = args[0]
+        return token_silly_deploy(amount)
+
+    elif operation == METHOD_TOKEN_TRANSFER:
+        #  token_transfer
+        from_pk = args[0]
+        to_pk = args[1]
+        amount = args[2]
+        return token_transfer(from_pk, to_pk, amount)
+
+    return False
+
+
+def Main(operation, args) -> int:
+    trigger = GetTrigger()
+    if trigger == b'\x10':
+        return handle_application(operation, args)
+    else:
+        return handle_verifications()
