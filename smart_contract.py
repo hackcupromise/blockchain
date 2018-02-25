@@ -133,12 +133,13 @@ def check_promise_funds(business_pk) -> int:
     return value
 
 
-def user_create_donation(user_pk, business_pk, charity_pk)-> bool:
+def user_create_donation(user_pk, business_pk, charity_pk, amount)-> bool:
     if not CheckWitness(user_pk):
         Log("User CheckWitness failed")
         return False
+    script_hash = GetExecutingScriptHash()
     pxid = generate_pxid(business_pk, user_pk, charity_pk)
-    amount = get_neo_input_amount()
+    amount = amount
 
     ctx = GetContext()
     key = concat(business_pk, FIELD_BUSINESS_PROMISE_AMOUNT)
@@ -149,6 +150,8 @@ def user_create_donation(user_pk, business_pk, charity_pk)-> bool:
         Log("which is more than the business has:")
         Log(business_funds)
         return False
+
+    token_transfer(user_pk, script_hash, amount)
 
     field_user_id = concat(pxid, FIELD_PXID_USER_ID)
     field_business_id = concat(pxid, FIELD_PXID_BUSINESS_ID)
@@ -221,7 +224,7 @@ def get_asset_input_amount(asset_id):
     return value
 
 
-def business_match_funds(business_pk, user_pk, charity_pk):
+def business_match_funds(business_pk, user_pk, charity_pk, amount):
     '''
     Inputs: business_pk: Public Key of business adding neo
     pxid: Identifier of transaction that the business is matching
@@ -233,9 +236,9 @@ def business_match_funds(business_pk, user_pk, charity_pk):
     if not CheckWitness(business_pk):
         Log("Business CheckWitness failed")
         return False
-
+    script_hash = GetExecutingScriptHash()
     pxid = generate_pxid(business_pk, user_pk, charity_pk)
-    committed_amount = get_neo_input_amount()
+    committed_amount = amount
     ctx = GetContext()
 
     promise_key = concat(pxid, FIELD_PXID_PROMISE)
@@ -259,6 +262,8 @@ def business_match_funds(business_pk, user_pk, charity_pk):
     # Update promised amount
     Put(ctx, promise_key, diff)
     Put(ctx, fulfilled_key, promised_amount)
+    # Do transaction
+    token_transfer(business_pk, script_hash, diff)
 
     return True
 
@@ -284,7 +289,7 @@ def check_donation_struct(user_pk, business_pk, charity_pk):
     business_id = Get(ctx, field_business_id)
     charity_id = Get(ctx, field_charity_id)
     amount = Get(ctx, field_amount_id)
-    promise  = Get(ctx, field_promise_id)
+    promise = Get(ctx, field_promise_id)
     time = Get(ctx, field_time_id)
     fulfilled = Get(ctx, field_fulfilled)
 
@@ -319,6 +324,9 @@ def transfer_funds(uid, amount):
 def charity_transfer_completed_contracts(charity_id, pxid):
     if not CheckWitness(charity_id):
         return False
+
+    script_hash = GetExecutingScriptHash()
+
     ctx = GetContext()
     time_key = concat(pxid, FIELD_PXID_TIME)
     time_out = Get(ctx, time_key)
@@ -337,7 +345,7 @@ def charity_transfer_completed_contracts(charity_id, pxid):
             amount = Get(ctx, amount_key)
             tot = fulfilled+amount
             # Transfer to charity
-            transfer_funds(charity_id, tot)
+            token_transfer(script_hash, charity_id, tot)
         else:
             # Promise was not fulfilled
             fulfilled_key = concat(pxid, FIELD_PXID_FULFILLED)
@@ -350,8 +358,8 @@ def charity_transfer_completed_contracts(charity_id, pxid):
             user_pk = Get(ctx, user_key)
             business_pk = Get(ctx, business_key)
 
-            transfer_funds(user_pk, amount)
-            transfer_funds(business_pk, fulfilled)
+            token_transfer(script_hash, user_pk, amount)
+            token_transfer(script_hash, business_pk, fulfilled)
 
         return True
 
@@ -372,7 +380,8 @@ def handle_application(operation, args):
         business_pk = args[0]
         user_pk = args[1]
         charity_pk = args[2]
-        return business_match_funds(business_pk, user_pk, charity_pk)
+        amount = args[3]
+        return business_match_funds(business_pk, user_pk, charity_pk, amount)
 
     elif operation == METHOD_CHECK_DONATION_STRUCT:
         # check_donation_struct
@@ -391,7 +400,8 @@ def handle_application(operation, args):
         user_pk = args[0]
         business_pk = args[1]
         charity_pk = args[2]
-        return user_create_donation(user_pk, business_pk, charity_pk)
+        amount = args[3]
+        return user_create_donation(user_pk, business_pk, charity_pk, amount)
 
     elif operation == METHOD_TOKEN_SILLY_DEPLOY:
         #  token_silly_deploy
