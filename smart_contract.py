@@ -6,7 +6,10 @@ from boa.blockchain.vm.Neo.Runtime import CheckWitness, Log
 from boa.blockchain.vm.Neo.Storage import GetContext, Get, Put, Delete
 from boa.blockchain.vm.Neo.Blockchain import GetHeight, GetHeader
 from boa.blockchain.vm.Neo.Header import GetTimestamp, GetNextConsensus, GetHash
+from boa.blockchain.vm.Neo.Action import RegisterAction
 
+
+transfer = RegisterAction('transfer', 'to', 'amount')
 
 # Field identifiers
 FIELD_BUSINESS_PROMISE_AMOUNT = 0x1
@@ -249,6 +252,53 @@ def build_csv_list(data):
         entry = concat(d, ",")
         output = concat(output, entry)
     return output
+
+
+def transfer_funds(uid, amount):
+    if not CheckWitness(uid):
+        return False
+    transfer(uid, amount)
+    return True
+
+
+def charity_transfer_completed_contracts(charity_id, pxid):
+    if not CheckWitness(charity_id):
+        return False
+    ctx = GetContext()
+    time_key = concat(pxid, FIELD_PXID_TIME)
+    time_out = Get(ctx, time_key)
+    current_time = get_current_time()
+
+    if time_out<current_time: # Contract has expired
+        promise_key = concat(pxid, FIELD_PXID_PROMISE)
+        promised = Get(ctx, promise_key)
+
+        if promised == 0: # Pay out to charity
+            # Get total data
+            fulfilled_key = concat(pxid, FIELD_PXID_FULFILLED)
+            amount_key = concat(pxid, FIELD_PXID_AMOUNT)
+
+            fulfilled = Get(ctx, fulfilled_key)
+            amount = Get(ctx, amount_key)
+            tot = fulfilled+amount
+            # Transfer to charity
+            transfer_funds(charity_id, tot)
+        else:
+            # Promise was not fulfilled
+            fulfilled_key = concat(pxid, FIELD_PXID_FULFILLED)
+            amount_key = concat(pxid, FIELD_PXID_AMOUNT)
+            user_key = concat(pxid, FIELD_PXID_USER_ID)
+            business_key = concat(pxid, FIELD_PXID_BUSINESS_ID)
+
+            fulfilled = Get(ctx, fulfilled_key)
+            amount = Get(ctx, amount_key)
+            user_pk = Get(ctx, user_key)
+            business_pk = Get(ctx, business_key)
+
+            transfer_funds(user_pk, amount)
+            transfer_funds(business_pk, fulfilled)
+
+        return True
 
 
 def Main(operation, args) -> int:
