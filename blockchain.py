@@ -13,6 +13,9 @@ METHOD_TRY_CHARITY_PAYOUT = 0x4
 METHOD_TRY_REFUND_USER = 0x5
 METHOD_TRY_REFUND_BUSINESS = 0x6
 
+neo_asset_id = b'\x9b|\xff\xda\xa6t\xbe\xae\x0f\x93\x0e\xbe`\x85\xaf\x90\x93\xe5\xfeV\xb3J\\"\x0c\xcd\xcfn\xfc3o\xc5'
+gas_asset_id = b'\xe7-(iy\xeel\xb1\xb7\xe6]\xfd\xdf\xb2\xe3\x84\x10\x0b\x8d\x14\x8ewX\xdeB\xe4\x16\x8bqy,`'
+
 '''
 Class copied from neo_ico_template:
 https://github.com/neonexchange/neo-ico-template
@@ -95,7 +98,8 @@ def GetEndTime():
         self.required_match = user_neo_amount
         '''
 
-def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
+
+def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash) -> bool:
     '''
     :param user_pk: user's public key
     :param business_pk: business's public key
@@ -106,9 +110,6 @@ def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
     '''
     if not CheckWitness(user_pk):  # is the user making the call
         return False
-
-    neo_asset_id = b'\x9b|\xff\xda\xa6t\xbe\xae\x0f\x93\x0e\xbe`\x85\xaf\x90\x93\xe5\xfeV\xb3J\\"\x0c\xcd\xcfn\xfc3o\xc5'
-    gas_asset_id = b'\xe7-(iy\xeel\xb1\xb7\xe6]\xfd\xdf\xb2\xe3\x84\x10\x0b\x8d\x14\x8ewX\xdeB\xe4\x16\x8bqy,`'
 
     tx = GetScriptContainer()  # type:Transaction
     references = tx.References
@@ -142,7 +143,7 @@ def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
         # Info to include: userpk, charitypk, businesspk, amount, amount promised, time, transaction ID - key
         ctx = GetContext() # Get context for storage
         # Check for existing shit I guess
-        if Get(ctx, txid_hash) == None:
+        if Get(ctx, txid_hash) is None:
             print("Error: TXID exists already")
             return False
         # Create list
@@ -163,30 +164,30 @@ def user_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
 
 
 
-    #def business_donate(business_pk, amount_bigint, txid_hash):
-    def business_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
-        '''
-        :param business_pk: business's public key
-        :param amount_bigint:
-        :param txid_hash: transaction identifier (byte array)
-        :return: true on success, false otherwise
-        '''
-        # Get info from txid_hash
-        # Add Neo to amount
-        # Subtract Neo from the temp shit
-        ctx = GetContext()
-        info = Get(ctx, txid_hash)
-        if info is None:
-            return False
+#def business_donate(business_pk, amount_bigint, txid_hash):
+def business_donate(user_pk, business_pk, charity_pk, amount_bigint, txid_hash):
+    '''
+    :param business_pk: business's public key
+    :param amount_bigint:
+    :param txid_hash: transaction identifier (byte array)
+    :return: true on success, false otherwise
+    '''
+    # Get info from txid_hash
+    # Add Neo to amount
+    # Subtract Neo from the temp shit
+    ctx = GetContext()
+    info = Get(ctx, txid_hash)
+    if info is None:
+        return False
 
-        # Info to include: userpk, charitypk, businesspk, amount, amount promised, time
-        promised = info[4]
-        if promised > 0:
-            #
-            return True
-
-
+    # Info to include: userpk, charitypk, businesspk, amount, amount promised, time
+    promised = info[4]
+    if promised > 0:
+        #
         return True
+
+
+    return True
 
 
 '''
