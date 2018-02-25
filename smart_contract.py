@@ -48,15 +48,6 @@ NEO_ASSET_ID = b'\x9b|\xff\xda\xa6t\xbe\xae\x0f\x93\x0e\xbe`\x85\xaf\x90\x93\xe5
 OWNER = b'8`V8\x16\x0f\x02z\x89\x97!t\xd9\xa9\x8d\x19\x07\x8c\xdf\xca'
 
 
-def get_balance(pk):
-    ctx = GetContext()
-    key = concat(pk, FIELD_ENTITY_TOKEN)
-    value = Get(ctx, key)
-    if not value:
-        return 0
-    return value
-
-
 def token_transfer(from_pk, to_pk, amount):
     if not CheckWitness(from_pk):
         return False
@@ -224,7 +215,7 @@ def get_asset_input_amount(asset_id):
     return value
 
 
-def business_match_funds(business_pk, user_pk, charity_pk, amount):
+def business_match_funds(business_pk, user_pk, charity_pk, committed_amount):
     '''
     Inputs: business_pk: Public Key of business adding neo
     pxid: Identifier of transaction that the business is matching
@@ -238,7 +229,6 @@ def business_match_funds(business_pk, user_pk, charity_pk, amount):
         return False
     script_hash = GetExecutingScriptHash()
     pxid = generate_pxid(business_pk, user_pk, charity_pk)
-    committed_amount = amount
     ctx = GetContext()
 
     promise_key = concat(pxid, FIELD_PXID_PROMISE)
@@ -261,6 +251,9 @@ def business_match_funds(business_pk, user_pk, charity_pk, amount):
 
     # Update promised amount
     Put(ctx, promise_key, diff)
+
+    fulfilled = Get(ctx, fulfilled_key)
+    fulfilled += promised_amount
     Put(ctx, fulfilled_key, promised_amount)
     # Do transaction
     token_transfer(business_pk, script_hash, diff)
