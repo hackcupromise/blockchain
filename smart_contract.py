@@ -140,7 +140,8 @@ def get_current_time():
     height = GetHeight()
     header = GetHeader(height)
     current_time = GetTimestamp(header)
-    Log("The current header timestamp is:", current_time)
+    Log("The current header timestamp is:")
+    Log(current_time)
     return current_time
 
 
@@ -160,9 +161,9 @@ def get_asset_input_amount(asset_id):
     Log("The tx inputs are:")
     Log(42)
     return value
-
-
-def business_match_funds(business_pk, pxid):
+#
+#
+def business_match_funds(business_pk, user_pk, charity_pk):
     '''
     Inputs: business_pk: Public Key of business adding neo
     pxid: Identifier of transaction that the business is matching
@@ -175,6 +176,7 @@ def business_match_funds(business_pk, pxid):
         Log("Business CheckWitness failed")
         return False
 
+    pxid = generate_pxid(business_pk, user_pk, charity_pk)
     committed_amount = get_neo_input_amount()
     ctx = GetContext()
 
@@ -204,11 +206,11 @@ def business_match_funds(business_pk, pxid):
 
 
 def generate_pxid(business_pk, user_pk, charity_pk):
-    return concat(business_pk, concat(user_pk, charity_pk))
+    user_charity = concat(user_pk, charity_pk)
+    return concat(business_pk, user_charity)
 
 
-def check_donation_struct(user_pk, business_pk, charity_pk):
-    pxid = generate_pxid(business_pk, user_pk, charity_pk)
+def check_donation_struct(pxid):
     ctx = GetContext()
 
     field_user_id = concat(pxid, FIELD_PXID_USER_ID)
@@ -227,28 +229,57 @@ def check_donation_struct(user_pk, business_pk, charity_pk):
     time = Get(ctx, field_time_id)
     fulfilled = Get(ctx, field_fulfilled)
 
-    ret_val = concat(user_id, concat(",", concat(business_id, concat(",", concat(charity_id, concat(",",
-                concat(amount, concat(",",concat(promise, concat(",",concat(time,concat(",", fulfilled))))))))))))
-    return ret_val
+    data = list(length=7)
+    data[0] = user_id
+    data[1] = business_id
+    data[2] = charity_id
+    data[3] = amount
+    data[4] = promise
+    data[5] = time
+    data[6] = fulfilled
+    output = build_csv_list(data)
+
+    return output
+
+
+def build_csv_list(data):
+    output = ""
+    for d in data:
+        entry = concat(d, ",")
+        output = concat(output, entry)
+    return output
 
 
 def Main(operation, args) -> int:
     if operation == METHOD_BUSINESS_ADD_FUNDS:
         #  business_add_funds
-        return business_add_funds(args[0], args[1])
+        business_pk = args[0]
+        amount = args[1]
+        return business_add_funds(business_pk, amount)
 
     elif operation == METHOD_BUSINESS_MATCH_FUNDS:
         #  business_match_funds
-        return business_match_funds(args[0], args[1])
+        business_pk = args[0]
+        user_pk = args[1]
+        charity_pk = args[2]
+        return business_match_funds(business_pk, user_pk, charity_pk)
 
     elif operation == METHOD_CHECK_DONATION_STRUCT:
         # check_donation_struct
-        return check_donation_struct(args[0], args[1], args[2])
+        user_pk = args[0]
+        business_pk = args[1]
+        charity_pk = args[2]
+        return check_donation_struct(user_pk, business_pk, charity_pk)
 
     elif operation == METHOD_CHECK_PROMISE_FUNDS:
         # check_promise_funds
-        return check_promise_funds(args[0])
+        business_pk = args[0]
+        return check_promise_funds(business_pk)
 
     elif operation == METHOD_USER_CREATE_DONATION:
         # user_create_donation
-        return user_create_donation(args[0], args[1], args[2])
+        user_pk = args[0]
+        business_pk = args[1]
+        charity_pk = args[2]
+        return user_create_donation(user_pk, business_pk, charity_pk)
+    pass
